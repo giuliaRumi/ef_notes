@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EF_Notes_Manager.Service;
@@ -19,62 +20,57 @@ namespace EF_Notes_Manager.Controllers
             _context = context;
         }
 
+        [HttpPost]
+        public IActionResult Create(NoteRequest noteRequest)
+        {
+            Note note = new Note(noteRequest.name, noteRequest.content);
+            _context.Notes.Add(note);
+            _context.SaveChanges();
+
+            return Created(nameof(Get), NoteResponse.from(note));
+        }
+
+        [HttpGet("{id}")]
+        public IActionResult Get(long id)
+        {
+            var note = _context.Notes.SingleOrDefault(n => n.Id == id);
+
+            return Ok(NoteResponse.from(note));
+        }
+
         [HttpGet]
         public async Task<IActionResult> List()
         {
             var notes = await _context.Notes
                 .ToArrayAsync();
 
-            return Ok(notes);
-        }
+            var notesResponse = new List<NoteResponse>();
 
-        [HttpGet("{name}")]
-        public ActionResult Get(string name)
-        {
-            var response = _context.Notes.SingleOrDefault(b => b.name == name);
+            foreach(Note n in notes)
+            {
+                notesResponse.Add(NoteResponse.from(n));
+            }
 
-            return Ok(response);
-        }
-
-        [HttpGet("{id}")]
-        public IActionResult Get(long id)
-        {
-            var response = _context.Notes.SingleOrDefault(b => b.id == id);
-
-            return Ok(response);
-        }
-
-        [HttpPost]
-        public IActionResult Create(Note note)
-        {
-            _context.Notes.Add(note);
-            _context.SaveChanges();
-
-            return Ok();
+            return Ok(notesResponse);
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<Note>> Edit(long id, Note note)
+        public async Task<ActionResult<NoteResponse>> Edit(long id, NoteRequest noteRequest)
         {
             try
             {
-                if (id != note.id)
-                {
-                    return BadRequest("Note ID mismatch");
-                }
 
-                var noteToUpdate = _context.Notes.SingleOrDefault(b => b.id == id);
-
+                Note noteToUpdate = _context.Notes.SingleOrDefault(n => n.Id == id);
                 if (noteToUpdate == null)
                 {
                     return NotFound($"Note with Id = {id} not found");
                 }
 
-                noteToUpdate.content = note.content;
-                noteToUpdate.name = note.name;
+                noteToUpdate.content = noteRequest.content;
+                noteToUpdate.name = noteRequest.name;
                 _context.SaveChanges();
 
-                return CreatedAtAction(nameof(Note), new { id = note.id }, note);
+                return Ok(NoteResponse.from(noteToUpdate));
             }
             catch (Exception)
             {
@@ -88,7 +84,7 @@ namespace EF_Notes_Manager.Controllers
         {
             try
             {
-                var notesToDelete = _context.Notes.SingleOrDefault(b => b.id == id);
+                var notesToDelete = _context.Notes.SingleOrDefault(n => n.Id == id);
 
                 if (notesToDelete == null)
                 {
